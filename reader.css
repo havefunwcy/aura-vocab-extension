@@ -323,8 +323,7 @@ body.reader-app {
 .textLayer {
   position: absolute !important;
   text-align: initial;
-  left: 0;
-  top: 0;
+  inset: 0 !important;
   overflow: hidden;
   opacity: 1;
   line-height: 1;

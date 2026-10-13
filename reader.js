@@ -269,6 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
         container: textLayerEl,
         viewport: viewport
       }).promise;
+
+      // 消除字体排版碎片，合并连字/字距切断的同一个单词 (如 st + uff 或 c + oncern)
+      unifyFragmentedSpans(textLayerEl);
     } catch (err) {
       console.warn(`渲染第 ${num} 页失败:`, err);
     }
@@ -418,7 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // 监听全页流的划词事件
   pagesStream.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    // 智能整词补全与边缘吸附（消除首尾残缺错位，如 uff -> stuff、oncer -> concern）
+    expandSelectionToFullWord(selection);
 
     const rawText = selection.toString().trim();
     if (!rawText) return;
@@ -443,6 +449,133 @@ document.addEventListener('DOMContentLoaded', () => {
       hidePopup();
     }
   });
+
+  // 合并 PDF.js 文本层因字距/连字被切割的断词碎片 (如 st + uff 或 c + oncern)
+  function unifyFragmentedSpans(textLayerEl) {
+    if (!textLayerEl) return;
+    const spans = Array.from(textLayerEl.querySelectorAll('span'));
+    if (spans.length <= 1) return;
+
+    for (let i = 0; i < spans.length - 1; i++) {
+      const curr = spans[i];
+      const next = spans[i + 1];
+      if (!curr || !next || !curr.parentNode || !next.parentNode) continue;
+
+      const currText = curr.textContent;
+      const nextText = next.textContent;
+      if (!currText || !nextText) continue;
+
+      // 如果当前 span 以字母/数字结尾，下一个 span 以字母/数字开头（非空格隔开）
+      if (/[\p{L}\p{N}]$/u.test(currText) && /^[\p{L}\p{N}]/u.test(nextText)) {
+        const currRect = curr.getBoundingClientRect();
+        const nextRect = next.getBoundingClientRect();
+        const isSameLine = Math.abs(currRect.top - nextRect.top) < 6;
+        const gap = nextRect.left - currRect.right;
+
+        // 在同一行且水平间距极小 (属于同一个单词的排版碎片，通常 gap < 8px)
+        if (isSameLine && gap > -10 && gap < 8) {
+          curr.textContent = currText + nextText;
+          next.remove();
+          spans.splice(i + 1, 1);
+          i--; // 重新检查当前 span 与新的下一个 span
+        }
+      }
+    }
+  }
+
+  // 智能整词吸附与补全：如果用户双击或划词时裁切在单词中段，自动补全首尾残缺部分并修正可视选区
+  function expandSelectionToFullWord(selection) {
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    const range = selection.getRangeAt(0);
+
+    const raw = selection.toString();
+    if (!raw.trim()) return null;
+
+    // 如果选中的是长篇句子（超过 6 个单词），尊重用户意图不自动补词
+    if (raw.trim().split(/\s+/).length > 6) return range;
+
+    let startNode = range.startContainer;
+    let startOffset = range.startOffset;
+
+    // 1. 向前探索单词前缀 (Prefix)
+    if (startNode.nodeType === Node.TEXT_NODE) {
+      const textBefore = startNode.textContent.slice(0, startOffset);
+      const match = textBefore.match(/[\p{L}\p{N}]+$/u);
+      if (match) {
+        try {
+          range.setStart(startNode, startOffset - match[0].length);
+        } catch (e) {}
+      } else if (startOffset === 0) {
+        // 如果当前节点开头无字符，向前检查紧邻的同级 Span（兜底 PDF 跨 span 碎片）
+        let currentSpan = startNode.parentElement;
+        if (currentSpan && currentSpan.tagName === 'SPAN') {
+          let prevSpan = currentSpan.previousElementSibling;
+          if (prevSpan && prevSpan.tagName === 'SPAN') {
+            const currRect = currentSpan.getBoundingClientRect();
+            const prevRect = prevSpan.getBoundingClientRect();
+            const isSameLine = Math.abs(currRect.top - prevRect.top) < 6;
+            const isAdjacent = Math.abs(currRect.left - prevRect.right) < 10;
+
+            if (isSameLine && isAdjacent) {
+              const prevText = prevSpan.textContent;
+              const prevMatch = prevText.match(/[\p{L}\p{N}]+$/u);
+              if (prevMatch) {
+                try {
+                  const targetNode = prevSpan.firstChild || prevSpan;
+                  range.setStart(targetNode, prevText.length - prevMatch[0].length);
+                } catch (e) {}
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. 向后探索单词后缀 (Suffix)
+    let endNode = range.endContainer;
+    let endOffset = range.endOffset;
+
+    if (endNode.nodeType === Node.TEXT_NODE) {
+      const textAfter = endNode.textContent.slice(endOffset);
+      const match = textAfter.match(/^[\p{L}\p{N}]+/u);
+      if (match) {
+        try {
+          range.setEnd(endNode, endOffset + match[0].length);
+        } catch (e) {}
+      } else if (endOffset >= endNode.textContent.length) {
+        // 如果在当前节点末尾，向后检查紧邻的同级 Span
+        let currentSpan = endNode.parentElement;
+        if (currentSpan && currentSpan.tagName === 'SPAN') {
+          let nextSpan = currentSpan.nextElementSibling;
+          if (nextSpan && nextSpan.tagName === 'SPAN') {
+            const currRect = currentSpan.getBoundingClientRect();
+            const nextRect = nextSpan.getBoundingClientRect();
+            const isSameLine = Math.abs(currRect.top - nextRect.top) < 6;
+            const isAdjacent = Math.abs(nextRect.left - currRect.right) < 10;
+
+            if (isSameLine && isAdjacent) {
+              const nextText = nextSpan.textContent;
+              const nextMatch = nextText.match(/^[\p{L}\p{N}]+/u);
+              if (nextMatch) {
+                try {
+                  const targetNode = nextSpan.firstChild || nextSpan;
+                  range.setEnd(targetNode, nextMatch[0].length);
+                } catch (e) {}
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 更新视图中的文字高亮，使之完整覆盖整个单词
+    try {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (e) {}
+
+    return range;
+  }
 
   function extractContext(selection) {
     try {
