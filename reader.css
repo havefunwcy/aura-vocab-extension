@@ -1,0 +1,405 @@
+/**
+ * Aura Dict - PDF Reader Stylesheet
+ * 新拟态触感设计系统：连续垂直流式滚轮排版、顶栏平滑折叠与标准 TextLayer 文本层
+ */
+
+:root {
+  --bg-surface: #e9edf2;
+  --bg-stage: #e2e6ec;
+  --text-main: #2d3644;
+  --text-muted: #798799;
+  --text-sub: #9caab9;
+  
+  --shadow-raised-btn: 3px 3px 7px rgba(166, 175, 189, 0.42), -3px -3px 7px rgba(255, 255, 255, 0.95);
+  --shadow-inset-groove: inset 2px 2px 5px rgba(166, 175, 189, 0.38), inset -2px -2px 5px rgba(255, 255, 255, 0.9);
+  --shadow-paper: 0 8px 26px rgba(166, 175, 189, 0.45);
+  
+  --accent-amber: #d97736;
+  --accent-green: #689f84;
+  --accent-blue: #4a7298;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.reader-app {
+  min-height: 100vh;
+  height: 100vh;
+  background-color: var(--bg-stage);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* 1. 顶栏控制台与折叠动效 */
+.reader-header {
+  height: 56px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 14px rgba(166, 175, 189, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 50;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reader-header.collapsed {
+  transform: translateY(-100%);
+  margin-top: -56px;
+  pointer-events: none;
+}
+
+.header-left, .header-center, .header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 沉浸式书名展示胶囊 (仅显示书名与必要按钮) */
+.doc-title-pill {
+  max-width: 380px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--text-main);
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-inset-groove);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* 实体按键 */
+.tactile-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 18px;
+  border: none;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 11.5px;
+  font-weight: 550;
+  cursor: pointer;
+  outline: none;
+  box-shadow: var(--shadow-raised-btn);
+  transition: all 0.12s ease;
+}
+
+.tactile-pill-btn:hover {
+  box-shadow: 2px 2px 5px rgba(166, 175, 189, 0.5), -2px -2px 5px rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+}
+
+.tactile-pill-btn:active, .tactile-pill-btn.depressed {
+  box-shadow: var(--shadow-inset-groove);
+  transform: translateY(1px);
+}
+
+.tactile-pill-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+/* 翻页与缩放集群 */
+.nav-cluster, .zoom-cluster {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tactile-circle-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 2px 2px 5px rgba(166, 175, 189, 0.4), -2px -2px 5px rgba(255, 255, 255, 0.95);
+  transition: all 0.12s;
+  padding: 0;
+}
+
+.tactile-circle-btn:hover {
+  color: var(--text-main);
+}
+
+.tactile-circle-btn:active {
+  box-shadow: inset 1px 1px 3px rgba(166, 175, 189, 0.45), inset -1px -1px 3px rgba(255, 255, 255, 0.95);
+  transform: translateY(1px);
+}
+
+.tactile-circle-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.page-meter {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-inset-groove);
+  font-size: 11.5px;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.page-current {
+  font-weight: 700;
+  color: var(--accent-amber);
+}
+
+.page-sep {
+  color: var(--text-sub);
+  font-size: 10px;
+}
+
+.page-total {
+  color: var(--text-muted);
+}
+
+.zoom-text {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  width: 44px;
+  text-align: center;
+}
+
+/* 折叠后的微型展开胶囊按键 */
+.expand-header-pill {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: var(--bg-surface);
+  box-shadow: 
+    0 4px 14px rgba(166, 175, 189, 0.5),
+    -2px -2px 6px rgba(255, 255, 255, 0.95);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+}
+
+.expand-header-pill:hover {
+  color: var(--text-main);
+  transform: translateX(-50%) translateY(2px);
+  box-shadow: 
+    0 6px 18px rgba(166, 175, 189, 0.6),
+    -2px -2px 6px rgba(255, 255, 255, 1);
+}
+
+.expand-header-pill svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+/* 2. 阅读舞台区：原生滚轮滚动 */
+.reader-stage {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 80px 16px;
+  scroll-behavior: smooth;
+}
+
+.reader-stage::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.reader-stage::-webkit-scrollbar-thumb {
+  background: rgba(166, 175, 189, 0.5);
+  border-radius: 4px;
+}
+
+/* 拖拽上传空状态 */
+.drop-zone-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 100px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop-groove {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  box-shadow: 
+    inset 3px 3px 8px rgba(166, 175, 189, 0.45),
+    inset -3px -3px 8px rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  transition: transform 0.2s;
+}
+
+.drop-zone-overlay:hover .drop-groove {
+  transform: scale(1.04);
+}
+
+.drop-icon {
+  width: 36px;
+  height: 36px;
+  fill: var(--text-sub);
+}
+
+.drop-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.drop-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+/* 3. 垂直连续页面流容器 */
+.pdf-pages-stream {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  max-width: 100%;
+}
+
+/* 4. PDF.js 标准文本对齐层 (像素级严丝合缝对齐) */
+.pdf-page-card {
+  position: relative;
+  background: #ffffff;
+  box-shadow: var(--shadow-paper);
+  border-radius: 2px;
+  line-height: 0;
+}
+
+.pdf-page-card canvas {
+  display: block;
+}
+
+.textLayer {
+  position: absolute !important;
+  text-align: initial;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  opacity: 1;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+  user-select: text !important;
+}
+
+.textLayer :is(span, br) {
+  color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  /* 绝不强制覆盖 font-family 与 line-height，保留 PDF 嵌入字体的精准几何度量 */
+}
+
+/* 划词高亮色 (柔和琥珀光) */
+.textLayer ::selection {
+  background: rgba(217, 119, 54, 0.32) !important;
+}
+.textLayer ::-moz-selection {
+  background: rgba(217, 119, 54, 0.32) !important;
+}
+.textLayer br::selection {
+  background: transparent !important;
+}
+
+/* 5. 沉浸式阅读进度记忆浮动提示 (Toast) */
+.reader-toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 
+    4px 4px 14px rgba(166, 175, 189, 0.45),
+    -4px -4px 14px rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.reader-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.reader-toast-icon {
+  color: var(--accent-amber);
+  font-size: 13px;
+}
+
+/* 页码计数器可点击跳转效果 */
+.page-meter {
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.page-meter:hover {
+  transform: scale(1.03);
+}
+.page-meter:active {
+  transform: scale(0.98);
+}

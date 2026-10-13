@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura | 触感生词工作台</title>
+  <link rel="stylesheet" href="notebook.css">
+  <link rel="icon" type="image/png" href="icons/icon48.png">
+</head>
+<body class="notebook-app">
+  <!-- 顶层仪器仪表控制台 -->
+  <header class="workbench-header">
+    <div class="header-inner">
+      <!-- 品牌标识与词汇量仪表 -->
+      <div class="brand-zone">
+        <div class="brand-indicator">
+          <span class="workbench-led" id="workbench-led"></span>
+          <span class="brand-text">AURA</span>
+          <span class="brand-badge">WORKBENCH</span>
+        </div>
+        
+        <div class="meter-pill" title="已收录词汇总量">
+          <span class="meter-number" id="total-count">0</span>
+          <span class="meter-label">WORDS STORED</span>
+        </div>
+      </div>
+
+      <!-- 中央内凹搜索滑槽 -->
+      <div class="search-groove-workbench">
+        <svg class="search-svg" viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        <input type="text" id="nb-search" class="search-input-field" placeholder="检索单词、释义或上下文例句..." spellcheck="false" autocomplete="off" />
+        <button class="clear-search-btn" id="nb-clear-search" style="display: none;">×</button>
+      </div>
+
+      <!-- 右侧实体按键组 -->
+      <div class="tools-zone">
+        <button class="tactile-pill-btn" id="btn-open-pdf" title="打开触感 PDF 阅读器">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          <span>PDF 阅读器</span>
+        </button>
+        <button class="tactile-pill-btn" id="btn-export-csv" title="导出为 CSV (格式完美兼容 Anki 记忆卡片)">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <span>导出 Anki / CSV</span>
+        </button>
+        <button class="tactile-pill-btn danger" id="btn-clear-all" title="清空全部生词库">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          <span>清空</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区：生词自适应网格 -->
+  <main class="workbench-main">
+    <div class="main-container">
+      <!-- 词条卡片流网格 -->
+      <div class="cards-grid" id="cards-grid">
+        <!-- 由 notebook.js 动态渲染 -->
+      </div>
+
+      <!-- 空状态面板 -->
+      <div class="empty-workbench" id="empty-workbench" style="display: none;">
+        <div class="empty-recess">
+          <svg class="empty-book-svg" viewBox="0 0 24 24">
+            <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/>
+          </svg>
+        </div>
+        <div class="empty-lead">生词库暂未收录词条</div>
+        <div class="empty-sub">在浏览任意网页时划选英文单词，点击星标按钮即可将单词与上下文原句收录至此。</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 浮雕反馈 Toast -->
+  <div class="tactile-toast" id="nb-toast"></div>
+
+  <script src="notebook.js"></script>
+</body>
+</html>

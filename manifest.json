@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Aura | 触感划词与生词本",
+  "version": "1.0.0",
+  "description": "新拟态触感交互的划词释义扩展，集成有道词典与生词本（支持本地 PDF 划词查词与 Anki 导出）",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://dict.youdao.com/*",
+    "file:///*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>",
+        "file:///*"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Aura 开关",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

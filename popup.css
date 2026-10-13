@@ -1,0 +1,267 @@
+/**
+ * Aura Dict - Mini Popup Neumorphic Stylesheet
+ * 紧凑型微型硬件控制器面板
+ */
+
+:root {
+  --bg-surface: #e9edf2;
+  --text-main: #2d3644;
+  --text-muted: #798799;
+  --text-sub: #9caab9;
+  --accent-green: #689f84;
+  --accent-amber: #d97736;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body.mini-app {
+  width: 242px;
+  margin: 0;
+  padding: 11px 13px 13px;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+  overflow: hidden;
+  user-select: none;
+  box-sizing: border-box;
+  /* 精密硬件外沿倒角：上/左高光倒棱，下/右深色阴影，塑造机械面板的一体成型压铸质感 */
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 1px 0 1px rgba(255, 255, 255, 0.75),
+    inset 0 -2px 3px rgba(166, 175, 189, 0.4),
+    inset -1px 0 2px rgba(166, 175, 189, 0.3);
+  border-bottom: 1px solid rgba(166, 175, 189, 0.25);
+}
+
+/* 一体化硬件控制台表面 */
+.mini-console {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 顶栏 */
+.console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 硬件状态微指示灯 */
+.status-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 5px rgba(104, 159, 132, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.status-led.disabled {
+  background: #aab5c2;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.brand-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-main);
+}
+
+/* 生词本入口实体微凸按键 */
+.open-notebook-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 
+    2px 2px 5px rgba(166, 175, 189, 0.42),
+    -2px -2px 5px rgba(255, 255, 255, 0.95);
+  transition: all 0.15s ease;
+}
+
+.open-notebook-btn:hover {
+  color: var(--text-main);
+  box-shadow: 
+    1px 1px 3px rgba(166, 175, 189, 0.5),
+    -1px -1px 3px rgba(255, 255, 255, 1);
+}
+
+.open-notebook-btn:active {
+  box-shadow: 
+    inset 1px 1px 3px rgba(166, 175, 189, 0.45),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.95);
+  transform: translateY(1px);
+}
+
+.open-notebook-btn svg {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+}
+
+.badge-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-amber);
+  background: rgba(217, 119, 54, 0.1);
+  padding: 1px 4px;
+  border-radius: 8px;
+  line-height: 1.1;
+}
+
+/* 核心实体开关区域：微雕内凹沉槽，形成工业触感面板控制台 */
+.switch-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #e4e9ef;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 
+    inset 2px 2px 5px rgba(166, 175, 189, 0.42),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.92),
+    0 1px 1px rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.slot-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.label-state {
+  font-size: 10.5px;
+  color: var(--accent-green);
+  transition: color 0.2s;
+}
+
+.label-state.disabled {
+  color: var(--text-sub);
+}
+
+/* 新拟态实体拨动开关 (Rocker / Toggle) */
+.tactile-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.tactile-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* 开关滑槽 (凹陷) */
+.switch-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-surface);
+  border-radius: 20px;
+  box-shadow: 
+    inset 2px 2px 4px rgba(166, 175, 189, 0.45),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.95);
+  transition: all 0.2s ease;
+}
+
+/* 开关滑块 (凸起实体按键) */
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  box-shadow: 
+    2px 2px 4px rgba(166, 175, 189, 0.45),
+    -2px -2px 4px rgba(255, 255, 255, 0.95);
+  transition: transform 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+/* 滑块中心微触点指示 */
+.switch-knob::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  opacity: 0.85;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+/* 激活状态 */
+.tactile-switch input:checked + .switch-track .switch-knob {
+  transform: translateX(20px);
+}
+
+/* 关闭状态 */
+.tactile-switch input:not(:checked) + .switch-track .switch-knob::after {
+  background: #aab5c2;
+  opacity: 0.4;
+}
+
+/* 本地 PDF 权限提示小槽 (Inset Notch) */
+.pdf-tip-slot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #e4e9ef;
+  box-shadow: 
+    inset 1px 1px 3px rgba(166, 175, 189, 0.35),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.85),
+    0 1px 1px rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.tip-dot {
+  font-size: 11px;
+  color: var(--accent-amber);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tip-txt {
+  flex: 1;
+}
+

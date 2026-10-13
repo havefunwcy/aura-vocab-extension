@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura | 触感 PDF 阅读器</title>
+  <link rel="stylesheet" href="libs/pdf_viewer.min.css">
+  <link rel="stylesheet" href="reader.css">
+  <link rel="icon" type="image/png" href="icons/icon48.png">
+</head>
+<body class="reader-app">
+  <!-- 顶栏仪器控制台 -->
+  <header class="reader-header" id="reader-header">
+    <div class="header-left">
+      <!-- 打开文件实体按键 -->
+      <label class="tactile-pill-btn" for="pdf-file-input" title="选择本地 PDF 文件">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>打开 PDF</span>
+      </label>
+      <input type="file" id="pdf-file-input" accept="application/pdf" style="display: none;">
+
+      <!-- 仅显示书名 -->
+      <span class="doc-title-pill" id="doc-title-pill" title="当前文档">未加载文档</span>
+    </div>
+
+    <!-- 中间翻页与缩放控制台 -->
+    <div class="header-center">
+      <div class="nav-cluster">
+        <button class="tactile-circle-btn" id="btn-prev-page" title="上一页 (PageUp / ←)">
+          <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
+
+        <div class="page-meter" title="当前滚动所在页 / 总页数">
+          <span class="page-current" id="page-num">1</span>
+          <span class="page-sep">/</span>
+          <span class="page-total" id="page-count">1</span>
+        </div>
+
+        <button class="tactile-circle-btn" id="btn-next-page" title="下一页 (PageDown / →)">
+          <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+        </button>
+      </div>
+
+      <div class="zoom-cluster">
+        <button class="tactile-circle-btn" id="btn-zoom-out" title="缩小 (-)">
+          <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+        </button>
+        <span class="zoom-text" id="zoom-text">100%</span>
+        <button class="tactile-circle-btn" id="btn-zoom-in" title="放大 (+)">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 右侧功能按键 -->
+    <div class="header-right">
+      <button class="tactile-pill-btn" id="btn-open-notebook" title="打开生词本工作台">
+        <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
+        <span>我的生词本</span>
+      </button>
+
+      <!-- 顶栏折叠按钮 -->
+      <button class="tactile-circle-btn" id="btn-collapse-header" title="折叠顶栏 (专注纯净阅读)">
+        <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 顶栏折叠后的微型展开胶囊按键 -->
+  <button class="expand-header-pill" id="btn-expand-header" title="展开控制台" style="display: none;">
+    <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+    <span>展开控制栏</span>
+  </button>
+
+  <!-- 沉浸式阅读进度记忆浮动提示 -->
+  <div class="reader-toast" id="reader-toast"></div>
+
+  <!-- PDF 舞台展示区：支持鼠标滚轮连续向下平滑滚动 -->
+  <main class="reader-stage" id="reader-stage">
+    <!-- 拖拽上传空状态 -->
+    <div class="drop-zone-overlay" id="drop-zone">
+      <div class="drop-groove">
+        <svg class="drop-icon" viewBox="0 0 24 24">
+          <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+        </svg>
+      </div>
+      <div class="drop-title">拖拽本地 PDF 文件至此，或点击顶栏「打开 PDF」</div>
+      <div class="drop-sub">支持鼠标滚轮垂直连贯阅读整书 • 自由划词感知释义 • 自动记录所在页码</div>
+    </div>
+
+    <!-- 垂直连续页面流容器 -->
+    <div class="pdf-pages-stream" id="pdf-pages-stream" style="display: none;">
+      <!-- 动态插入每页卡片 -->
+    </div>
+  </main>
+
+  <!-- 离线依赖官方 PDF.js -->
+  <script src="libs/pdf.min.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>
