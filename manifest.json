@@ -1,10 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Aura | 触感划词与生词本",
-  "version": "1.0.0",
-  "description": "新拟态触感交互的划词释义扩展，集成有道词典与生词本（支持本地 PDF 划词查词与 Anki 导出）",
+  "version": "1.1.0",
+  "description": "新拟态触感交互的查词与生词本扩展，支持原生 PDF 极速阅读、常驻侧边栏查词、复制即查词与 Anki 导出",
   "permissions": [
-    "storage"
+    "storage",
+    "sidePanel",
+    "contextMenus",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://dict.youdao.com/*",
@@ -12,6 +15,18 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "commands": {
+    "_execute_side_panel": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "mac": "Alt+S"
+      },
+      "description": "打开/切换 Aura 触感查词侧边栏"
+    }
   },
   "content_scripts": [
     {
@@ -26,7 +41,7 @@
     }
   ],
   "action": {
-    "default_title": "Aura 开关",
+    "default_title": "Aura 开关与面板",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

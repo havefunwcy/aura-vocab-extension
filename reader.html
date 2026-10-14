@@ -3,12 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aura | 触感 PDF 阅读器</title>
-  <link rel="stylesheet" href="libs/pdf_viewer.min.css">
+  <title>Aura | 触感沉浸流 PDF 阅读器</title>
   <link rel="stylesheet" href="reader.css">
   <link rel="icon" type="image/png" href="icons/icon48.png">
 </head>
-<body class="reader-app">
+<body class="reader-app theme-warm">
   <!-- 顶栏仪器控制台 -->
   <header class="reader-header" id="reader-header">
     <div class="header-left">
@@ -21,42 +20,50 @@
 
       <!-- 仅显示书名 -->
       <span class="doc-title-pill" id="doc-title-pill" title="当前文档">未加载文档</span>
+
+      <!-- 目录大纲抽屉开关 -->
+      <button class="tactile-circle-btn" id="btn-toggle-toc" title="查看章节大纲目录" style="display: none;">
+        <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
     </div>
 
-    <!-- 中间翻页与缩放控制台 -->
+    <!-- 中间翻页与排版控制台 -->
     <div class="header-center">
       <div class="nav-cluster">
-        <button class="tactile-circle-btn" id="btn-prev-page" title="上一页 (PageUp / ←)">
+        <button class="tactile-circle-btn" id="btn-prev-page" title="上一页 / 上一章 (PageUp / ←)">
           <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
         </button>
 
-        <div class="page-meter" id="page-meter" title="点击跳转指定页码">
+        <div class="page-meter" id="page-meter" title="点击快速跳转指定页码">
           <span class="page-current" id="page-num">1</span>
           <span class="page-sep">/</span>
           <span class="page-total" id="page-count">1</span>
         </div>
 
-        <button class="tactile-circle-btn" id="btn-next-page" title="下一页 (PageDown / →)">
+        <button class="tactile-circle-btn" id="btn-next-page" title="下一页 / 下一章 (PageDown / →)">
           <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
         </button>
       </div>
 
-      <div class="zoom-cluster">
-        <button class="tactile-circle-btn" id="btn-zoom-out" title="缩小 (-)">
-          <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
-        </button>
-        <span class="zoom-text" id="zoom-text">130%</span>
-        <button class="tactile-circle-btn" id="btn-zoom-in" title="放大 (+)">
-          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        </button>
+      <!-- 双模式切换胶囊 (沉浸重排流 / 原始版面) -->
+      <div class="mode-switch-pill" id="mode-switcher" style="display: none;">
+        <button class="mode-tab active" id="tab-reflow" title="原生 HTML 纯净重排版，彻底告别错位">✨ 沉浸重排</button>
+        <button class="mode-tab" id="tab-original" title="原始版面完整呈现">📄 原版视图</button>
       </div>
     </div>
 
     <!-- 右侧功能按键 -->
     <div class="header-right">
+      <!-- 排版调控按键 (字号、行距、纸色) -->
+      <button class="tactile-pill-btn" id="btn-typography" title="阅读排版偏好 (字号、主题配色、字体)">
+        <span style="font-weight: 700; font-size: 13px; font-family: serif;">Aa</span>
+        <span>排版</span>
+      </button>
+
+      <!-- 打开生词本工作台 -->
       <button class="tactile-pill-btn" id="btn-open-notebook" title="打开生词本工作台">
         <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
-        <span>我的生词本</span>
+        <span>生词本</span>
       </button>
 
       <!-- 顶栏折叠按钮 -->
@@ -75,8 +82,51 @@
   <!-- 沉浸式阅读进度记忆浮动提示 -->
   <div class="reader-toast" id="reader-toast"></div>
 
-  <!-- Mozilla 官方标准 PDFViewer 容器 (严丝合缝像素级对齐架构) -->
-  <div id="viewerContainer" class="pdf-viewer-container" tabindex="0">
+  <!-- 章节大纲目录抽屉 -->
+  <aside class="toc-drawer" id="toc-drawer">
+    <div class="toc-header">
+      <span class="toc-title">章节目录大纲</span>
+      <button class="tactile-circle-btn" id="btn-close-toc" title="关闭目录">×</button>
+    </div>
+    <div class="toc-list" id="toc-list">
+      <!-- 动态插入目录项 -->
+    </div>
+  </aside>
+  <div class="toc-backdrop" id="toc-backdrop"></div>
+
+  <!-- 排版设置弹出实体面板 -->
+  <div class="typography-popover" id="typography-popover" style="display: none;">
+    <div class="pop-section-title">阅读质感底色</div>
+    <div class="theme-palette">
+      <button class="theme-dot theme-dot-warm active" data-theme="theme-warm" title="护眼暖杏羊皮纸"></button>
+      <button class="theme-dot theme-dot-paper" data-theme="theme-paper" title="触感纯净白纸"></button>
+      <button class="theme-dot theme-dot-green" data-theme="theme-green" title="沉浸护眼豆沙绿"></button>
+      <button class="theme-dot theme-dot-dark" data-theme="theme-dark" title="深空暗夜深墨色"></button>
+    </div>
+
+    <div class="pop-section-title">文字字号</div>
+    <div class="font-size-cluster">
+      <button class="tactile-circle-btn" id="btn-font-dec" title="缩小字号">A-</button>
+      <span class="font-size-text" id="font-size-val">18px</span>
+      <button class="tactile-circle-btn" id="btn-font-inc" title="放大字号">A+</button>
+    </div>
+
+    <div class="pop-section-title">字体类型</div>
+    <div class="font-family-cluster">
+      <button class="tactile-pill-btn font-tab active" id="btn-font-serif" data-family="serif">古典衬线</button>
+      <button class="tactile-pill-btn font-tab" id="btn-font-sans" data-family="sans">现代黑体</button>
+    </div>
+
+    <div class="pop-section-title">阅读页面版宽</div>
+    <div class="page-width-cluster">
+      <button class="tactile-pill-btn width-tab" data-width="680px">紧凑</button>
+      <button class="tactile-pill-btn width-tab active" data-width="840px">舒适</button>
+      <button class="tactile-pill-btn width-tab" data-width="1020px">宽阔</button>
+    </div>
+  </div>
+
+  <!-- 主阅读舞台区域 -->
+  <main class="reader-stage" id="reader-stage">
     <!-- 拖拽上传空状态 -->
     <div class="drop-zone-overlay" id="drop-zone">
       <div class="drop-groove">
@@ -85,16 +135,31 @@
         </svg>
       </div>
       <div class="drop-title">拖拽本地 PDF 文件至此，或点击顶栏「打开 PDF」</div>
-      <div class="drop-sub">Mozilla PDF.js 官方标准渲染引擎 • 连续流式垂直滚动 • 像素级零错位划词 • 自动恢复上次阅读进度</div>
+      <div class="drop-sub">✨ 沉浸重排流模式：100% 网页原生文本 • 彻底消灭 Canvas 错位 • 自由调字号与护眼纸色 • 丝滑划词查词</div>
     </div>
 
-    <!-- 官方标准 PDFViewer 挂载点 -->
-    <div id="viewer" class="pdfViewer"></div>
-  </div>
+    <!-- 方案二：重排版沉浸流容器 (100% 原生语义化 HTML 文档) -->
+    <div class="reflow-container" id="reflow-container" style="display: none;">
+      <article class="reflow-book-article" id="reflow-article">
+        <!-- 动态连续流式注入章节与段落 -->
+      </article>
+      <!-- 滚动到底部自动加载指示器 -->
+      <div class="reflow-loading-sentinel" id="reflow-sentinel">
+        <div class="spinner-dot"></div>
+        <span>正在排版后续章节...</span>
+      </div>
+    </div>
 
-  <!-- 离线依赖官方 PDF.js 与 PDFViewer 标准组件 -->
+    <!-- 备选：原始扫描版面视图容器 -->
+    <div class="original-viewer-container" id="original-viewer-container" style="display: none;">
+      <div class="original-pages-stream" id="original-pages-stream">
+        <!-- 动态插入原版 Canvas 页面 -->
+      </div>
+    </div>
+  </main>
+
+  <!-- 离线依赖官方 PDF.js -->
   <script src="libs/pdf.min.js"></script>
-  <script src="libs/pdf_viewer.min.js"></script>
   <script src="reader.js"></script>
 </body>
 </html>

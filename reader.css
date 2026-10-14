@@ -1,6 +1,6 @@
 /**
- * Aura Dict - PDF Reader Stylesheet
- * 新拟态触感设计系统：Mozilla 官方标准 PDFViewer 架构、连续垂直滚轮排版与像素级文本对齐
+ * Aura Dict - PDF Reader Stylesheet (方案二：重排版沉浸流模式)
+ * 100% 网页原生语义文本、无缝消除任何选区错位、支持护眼纸色与现代电子书排版
  */
 
 :root {
@@ -9,14 +9,65 @@
   --text-main: #2d3644;
   --text-muted: #798799;
   --text-sub: #9caab9;
-  
+
   --shadow-raised-btn: 3px 3px 7px rgba(166, 175, 189, 0.42), -3px -3px 7px rgba(255, 255, 255, 0.95);
   --shadow-inset-groove: inset 2px 2px 5px rgba(166, 175, 189, 0.38), inset -2px -2px 5px rgba(255, 255, 255, 0.9);
-  --shadow-paper: 0 8px 26px rgba(166, 175, 189, 0.45);
-  
+  --shadow-book-paper: 0 10px 30px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+
   --accent-amber: #d97736;
   --accent-green: #689f84;
   --accent-blue: #4a7298;
+
+  /* 默认排版参数 */
+  --reflow-font-size: 18px;
+  --reflow-line-height: 1.8;
+  --reflow-max-width: 840px;
+  --reflow-font-family: "Georgia", "Merriweather", "Songti SC", "SimSun", serif;
+
+  /* 主题配色默认值 (暖杏羊皮纸) */
+  --book-bg: #f7f1e5;
+  --book-text: #2d2925;
+  --book-heading: #1a1715;
+  --book-subtext: #8c827a;
+  --book-divider: rgba(140, 130, 122, 0.25);
+  --book-selection: rgba(217, 119, 54, 0.28);
+}
+
+/* 主题预设 */
+body.theme-warm {
+  --book-bg: #f7f1e5;
+  --book-text: #2d2925;
+  --book-heading: #1a1715;
+  --book-subtext: #8c827a;
+  --book-divider: rgba(140, 130, 122, 0.25);
+  --book-selection: rgba(217, 119, 54, 0.32);
+}
+
+body.theme-paper {
+  --book-bg: #ffffff;
+  --book-text: #27313f;
+  --book-heading: #141b24;
+  --book-subtext: #828fa0;
+  --book-divider: rgba(166, 175, 189, 0.3);
+  --book-selection: rgba(74, 114, 152, 0.28);
+}
+
+body.theme-green {
+  --book-bg: #edf3ea;
+  --book-text: #233126;
+  --book-heading: #152218;
+  --book-subtext: #788a7c;
+  --book-divider: rgba(120, 138, 124, 0.25);
+  --book-selection: rgba(104, 159, 132, 0.32);
+}
+
+body.theme-dark {
+  --book-bg: #1a1f26;
+  --book-text: #c9d1d9;
+  --book-heading: #f0f6fc;
+  --book-subtext: #8b949e;
+  --book-divider: rgba(255, 255, 255, 0.12);
+  --book-selection: rgba(217, 119, 54, 0.45);
 }
 
 * {
@@ -38,7 +89,7 @@ body.reader-app {
   user-select: none;
 }
 
-/* 1. 顶栏控制台与折叠动效 */
+/* 1. 顶栏控制台 */
 .reader-header {
   height: 56px;
   background: var(--bg-surface);
@@ -65,9 +116,9 @@ body.reader-app {
   gap: 12px;
 }
 
-/* 沉浸式书名展示胶囊 (仅显示书名与必要按钮) */
+/* 书名展示胶囊 */
 .doc-title-pill {
-  max-width: 380px;
+  max-width: 320px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -81,7 +132,7 @@ body.reader-app {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-/* 实体按键 */
+/* 实体胶囊按键 */
 .tactile-pill-btn {
   display: flex;
   align-items: center;
@@ -104,7 +155,7 @@ body.reader-app {
   transform: translateY(-1px);
 }
 
-.tactile-pill-btn:active, .tactile-pill-btn.depressed {
+.tactile-pill-btn:active, .tactile-pill-btn.active {
   box-shadow: var(--shadow-inset-groove);
   transform: translateY(1px);
 }
@@ -115,16 +166,16 @@ body.reader-app {
   fill: currentColor;
 }
 
-/* 翻页与缩放集群 */
-.nav-cluster, .zoom-cluster {
+/* 翻页导航集群 */
+.nav-cluster {
   display: flex;
   align-items: center;
   gap: 7px;
 }
 
 .tactile-circle-btn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: var(--bg-surface);
@@ -141,6 +192,7 @@ body.reader-app {
 
 .tactile-circle-btn:hover {
   color: var(--text-main);
+  transform: translateY(-1px);
 }
 
 .tactile-circle-btn:active {
@@ -149,8 +201,8 @@ body.reader-app {
 }
 
 .tactile-circle-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   fill: currentColor;
 }
 
@@ -172,10 +224,6 @@ body.reader-app {
   transform: scale(1.03);
 }
 
-.page-meter:active {
-  transform: scale(0.98);
-}
-
 .page-current {
   font-weight: 700;
   color: var(--accent-amber);
@@ -190,11 +238,33 @@ body.reader-app {
   color: var(--text-muted);
 }
 
-.zoom-text {
-  font-size: 11.5px;
+/* 双模式切换胶囊 (沉浸重排流 / 原版视图) */
+.mode-switch-pill {
+  display: flex;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-inset-groove);
+  border-radius: 16px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  gap: 2px;
+}
+
+.mode-tab {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-muted);
-  width: 44px;
-  text-align: center;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.mode-tab.active {
+  background: #ffffff;
+  color: var(--accent-amber);
+  box-shadow: 1px 1px 4px rgba(166, 175, 189, 0.4);
 }
 
 /* 折叠后的微型展开胶囊按键 */
@@ -225,9 +295,6 @@ body.reader-app {
 .expand-header-pill:hover {
   color: var(--text-main);
   transform: translateX(-50%) translateY(2px);
-  box-shadow: 
-    0 6px 18px rgba(166, 175, 189, 0.6),
-    -2px -2px 6px rgba(255, 255, 255, 1);
 }
 
 .expand-header-pill svg {
@@ -236,35 +303,184 @@ body.reader-app {
   fill: currentColor;
 }
 
-/* 2. Mozilla 官方标准 PDFViewer 容器与滚轮流排版 */
-#viewerContainer {
-  position: absolute !important;
+/* 2. 章节大纲目录抽屉 */
+.toc-drawer {
+  position: fixed;
   top: 56px;
-  bottom: 0;
   left: 0;
-  right: 0;
-  overflow: auto;
-  outline: none;
+  bottom: 0;
+  width: 320px;
+  background: var(--bg-surface);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.toc-drawer.open {
+  transform: translateX(0);
+}
+
+.toc-header {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 6px rgba(166, 175, 189, 0.15);
+}
+
+.toc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+
+.toc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.12s;
+  margin-bottom: 4px;
+}
+
+.toc-item:hover {
+  background: rgba(217, 119, 54, 0.1);
+  color: var(--accent-amber);
+}
+
+.toc-item-page {
+  font-size: 10.5px;
+  color: var(--text-sub);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.toc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(2px);
+  z-index: 55;
+  display: none;
+}
+
+.toc-backdrop.visible {
+  display: block;
+}
+
+/* 3. 排版设置实体面板 (Popover) */
+.typography-popover {
+  position: fixed;
+  top: 66px;
+  right: 20px;
+  width: 280px;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 
+    8px 8px 24px rgba(166, 175, 189, 0.5),
+    -6px -6px 20px rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pop-section-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.theme-palette {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-inset-groove);
+}
+
+.theme-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.theme-dot:hover {
+  transform: scale(1.1);
+}
+
+.theme-dot.active {
+  border-color: var(--accent-amber);
+  transform: scale(1.08);
+}
+
+.theme-dot-warm { background: #f7f1e5; }
+.theme-dot-paper { background: #ffffff; border: 1px solid #d2d8e0; }
+.theme-dot-green { background: #edf3ea; }
+.theme-dot-dark { background: #1a1f26; }
+
+.font-size-cluster, .font-family-cluster, .page-width-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.font-size-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  width: 45px;
+  text-align: center;
+}
+
+.font-tab, .width-tab {
+  flex: 1;
+  justify-content: center;
+  padding: 5px 0;
+  font-size: 11px;
+}
+
+/* 4. 主舞台与方案二重排版文档容器 */
+.reader-stage {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
   background-color: var(--bg-stage);
-  transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  user-select: text !important;
-  -webkit-user-select: text !important;
+  scroll-behavior: smooth;
+  padding: 24px 16px 80px 16px;
 }
 
-#viewerContainer.header-collapsed {
-  top: 0;
-}
-
-#viewerContainer::-webkit-scrollbar {
+.reader-stage::-webkit-scrollbar {
   width: 8px;
-  height: 8px;
 }
-#viewerContainer::-webkit-scrollbar-thumb {
+.reader-stage::-webkit-scrollbar-thumb {
   background: rgba(166, 175, 189, 0.5);
   border-radius: 4px;
 }
 
-/* 拖拽上传空状态 */
+/* 拖拽空状态 */
 .drop-zone-overlay {
   display: flex;
   flex-direction: column;
@@ -314,66 +530,133 @@ body.reader-app {
   line-height: 1.6;
 }
 
-/* 3. 官方 PDF.js 标准页面流定制 (融入触感新拟态阴影与纸质质感) */
-.pdfViewer {
-  padding: 24px 0 80px 0;
+/* 方案二：重排版沉浸流图书容器 (纯正 HTML 语义段落，100% 杜绝任何错位) */
+.reflow-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.reflow-book-article {
+  width: 100%;
+  max-width: var(--reflow-max-width);
+  background-color: var(--book-bg);
+  color: var(--book-text);
+  border-radius: 4px;
+  box-shadow: var(--shadow-book-paper);
+  padding: 48px 54px 64px 54px;
+  font-family: var(--reflow-font-family);
+  font-size: var(--reflow-font-size);
+  line-height: var(--reflow-line-height);
+  transition: background-color 0.2s, color 0.2s;
   user-select: text !important;
   -webkit-user-select: text !important;
 }
 
-.pdfViewer .page {
-  margin: 20px auto !important;
-  box-shadow: var(--shadow-paper) !important;
-  border: none !important;
-  border-radius: 2px !important;
-  background-color: #ffffff !important;
-  box-sizing: content-box;
-  user-select: text !important;
-  -webkit-user-select: text !important;
+/* 划词高亮色 (柔和沉浸色) */
+.reflow-book-article ::selection {
+  background: var(--book-selection) !important;
+}
+.reflow-book-article ::-moz-selection {
+  background: var(--book-selection) !important;
 }
 
-/* 4. PDF.js 官方标准文本层定制 (确保支持鼠标划选、高亮及零事件遮挡) */
-.textLayer {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 10 !important;
-  opacity: 1 !important;
-  line-height: 1;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  cursor: text !important;
-  pointer-events: auto !important;
+/* 页码分割标记 */
+.page-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 36px 0 28px 0;
+  position: relative;
+  user-select: none;
 }
 
-.textLayer :is(span, br) {
-  user-select: text !important;
-  -webkit-user-select: text !important;
-  color: transparent !important;
+.page-marker::before {
+  content: "";
   position: absolute;
-  white-space: pre;
-  cursor: text !important;
-  transform-origin: 0 0;
-  pointer-events: auto !important;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--book-divider);
+  z-index: 1;
 }
 
-/* 划词高亮色 (柔和触感琥珀光) */
-.textLayer ::selection {
-  background: rgba(217, 119, 54, 0.35) !important;
-}
-.textLayer ::-moz-selection {
-  background: rgba(217, 119, 54, 0.35) !important;
-}
-.textLayer br::selection {
-  background: transparent !important;
+.marker-pill {
+  position: relative;
+  z-index: 2;
+  background: var(--book-bg);
+  padding: 2px 14px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-family: -apple-system, sans-serif;
+  font-weight: 600;
+  color: var(--book-subtext);
+  border: 1px solid var(--book-divider);
 }
 
-/* 避免其它辅助图层遮挡文字划选事件 */
-.annotationEditorLayer,
-.annotationLayer {
-  pointer-events: none !important;
+/* 原生语义化段落排版 */
+.reflow-paragraph {
+  margin-bottom: 1.3em;
+  text-align: justify;
+  text-justify: inter-word;
+  word-break: break-word;
+  hyphens: auto;
 }
-.annotationLayer a {
-  pointer-events: auto !important;
+
+/* 章节大标题 */
+.reflow-heading {
+  font-size: 1.6em;
+  font-weight: 750;
+  color: var(--book-heading);
+  margin: 1.8em 0 1em 0;
+  line-height: 1.3;
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+
+/* 滚动加载指示器 */
+.reflow-loading-sentinel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0 40px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.spinner-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(217, 119, 54, 0.3);
+  border-top-color: var(--accent-amber);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 原版扫描视图容器 (备选) */
+.original-viewer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.original-pages-stream {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.original-page-card {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 2px;
+  background: #ffffff;
 }
 
 /* 5. 沉浸式阅读进度记忆浮动提示 (Toast) */

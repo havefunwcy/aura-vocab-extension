@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura | 触感阅读侧边栏</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <link rel="icon" type="image/png" href="icons/icon48.png">
+</head>
+<body class="sidepanel-app">
+  <!-- 顶栏仪器控制台 -->
+  <header class="panel-header">
+    <div class="brand-cluster">
+      <span class="status-led active" id="status-led" title="Aura 感知就绪"></span>
+      <span class="brand-title">AURA 触感助手</span>
+      <span class="shortcut-badge" title="快捷键打开/关闭侧边栏">Alt+S</span>
+    </div>
+    <div class="header-actions">
+      <button class="tactile-pill-btn" id="btn-open-notebook" title="打开全屏生词本工作台">
+        <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
+        <span>生词本</span>
+        <span class="badge-count" id="badge-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 触感感知配置拨动集群 -->
+  <section class="toggles-rack">
+    <!-- 复制即查词开关 (原生 PDF 极致体验：双击文字按 Ctrl+C 即刻自动感知查词) -->
+    <div class="toggle-slot" title="在原生 PDF 中选中文字后按 Ctrl+C，侧边栏将自动感知并呈现释义">
+      <div class="slot-info">
+        <span class="slot-title">📋 复制即查词</span>
+        <span class="slot-sub">Ctrl+C 自动感知释义</span>
+      </div>
+      <label class="tactile-switch">
+        <input type="checkbox" id="toggle-clipboard" checked>
+        <span class="switch-track">
+          <span class="switch-knob"></span>
+        </span>
+      </label>
+    </div>
+
+    <!-- 自动发音开关 -->
+    <div class="toggle-slot" title="查词成功后自动播放真人发音">
+      <div class="slot-info">
+        <span class="slot-title">🔊 自动朗读</span>
+        <span class="slot-sub">查询后播放发音</span>
+      </div>
+      <label class="tactile-switch">
+        <input type="checkbox" id="toggle-autoplay">
+        <span class="switch-track">
+          <span class="switch-knob"></span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <!-- 即时实体搜索框 -->
+  <section class="search-section">
+    <div class="search-groove">
+      <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="search-input" class="search-input" placeholder="输入词汇或按回车查询..." autocomplete="off">
+      <button class="tactile-circle-btn" id="btn-search" title="执行查询">
+        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- 核心查词卡片展示区 -->
+  <main class="lookup-card-container">
+    <!-- 空状态指引 -->
+    <div class="empty-state" id="lookup-empty">
+      <div class="empty-groove">
+        <svg class="empty-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+      </div>
+      <div class="empty-title">在原生 PDF 中畅快阅读</div>
+      <div class="empty-sub">
+        • 选中文字 <b>右键点击「Aura 触感查词」</b><br>
+        • 或开启上方<b>「复制即查词」</b>按 <b>Ctrl+C</b> 即时感知<br>
+        • 或直接在上方输入框键入单词
+      </div>
+    </div>
+
+    <!-- 激活状态：词汇释义卡片 -->
+    <div class="word-card" id="lookup-card" style="display: none;">
+      <div class="card-top">
+        <div class="word-header">
+          <h2 class="word-text" id="card-word">concern</h2>
+          <span class="phonetic-text" id="card-phonetic">[/kənˈsɜːrn/]</span>
+        </div>
+        <div class="card-btn-cluster">
+          <button class="tactile-circle-btn" id="card-btn-audio" title="朗读发音">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </button>
+          <button class="tactile-circle-btn star-btn" id="card-btn-star" title="收录至生词本">
+            <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 下沉式释义槽 -->
+      <div class="meaning-groove">
+        <ul class="explains-list" id="card-explains">
+          <!-- 动态插入释义列表 -->
+        </ul>
+      </div>
+
+      <!-- 阅读语境与来源标注 -->
+      <div class="context-groove" id="context-wrapper">
+        <div class="context-label">上下文语境例句</div>
+        <div class="context-text" id="card-context" contenteditable="true" title="点击可编辑补充例句">暂无上下文语境</div>
+      </div>
+
+      <div class="card-footer">
+        <span class="source-tag" id="card-source">原生阅读器</span>
+        <span class="save-status" id="card-status">○ 点击星标入库</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- 底部常驻会话最近查词列表 -->
+  <section class="recent-section">
+    <div class="recent-header">
+      <span class="recent-title">本次阅读历史</span>
+      <button class="tactile-mini-btn" id="btn-clear-recent" title="清空本次会话记录">清空</button>
+    </div>
+    <div class="recent-scroll-area" id="recent-list">
+      <!-- 动态插入最近查词小胶囊 -->
+    </div>
+  </section>
+
+  <!-- 底部工具条 -->
+  <footer class="panel-footer">
+    <button class="tactile-action-btn" id="btn-export-anki" title="导出已收藏生词为 Anki CSV 牌组">
+      <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      <span>一键导出 Anki 词库</span>
+    </button>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

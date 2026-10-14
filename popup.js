@@ -1,6 +1,6 @@
 /**
  * Aura Dict - Mini Popup Controller
- * 管理划词插件的主电源开关与生词本独立网页入口
+ * 管理划词插件的主电源开关与沉浸重排阅读器、侧边栏、生词本入口
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const statusLed = document.getElementById('status-led');
   const stateText = document.getElementById('state-text');
   const badgeCount = document.getElementById('badge-count');
+  const openReaderBtn = document.getElementById('btn-open-reader');
+  const openSidepanelBtn = document.getElementById('btn-open-sidepanel');
   const openNotebookBtn = document.getElementById('btn-open-notebook');
 
   // 读取配置与词汇总量
@@ -25,23 +27,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateSwitchUI(isEnabled);
   });
 
-  const openReaderBtn = document.getElementById('btn-open-reader');
-
-  // 打开专属 PDF 触感阅读器
+  // 打开 PDF 触感沉浸重排阅读器
   if (openReaderBtn) {
     openReaderBtn.addEventListener('click', () => {
       chrome.tabs.create({
         url: chrome.runtime.getURL('reader.html')
       });
+      window.close();
+    });
+  }
+
+  // 打开 Chrome 原生阅读伴侣侧边栏
+  if (openSidepanelBtn) {
+    openSidepanelBtn.addEventListener('click', async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab && tab.id) {
+          try {
+            await chrome.sidePanel.open({ tabId: tab.id });
+          } catch {
+            await chrome.sidePanel.open({ windowId: tab.windowId });
+          }
+        }
+      } catch (e) {
+        console.warn('开启侧边栏异常:', e);
+      }
+      window.close();
     });
   }
 
   // 打开独立全屏生词本网页
-  openNotebookBtn.addEventListener('click', () => {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL('notebook.html')
+  if (openNotebookBtn) {
+    openNotebookBtn.addEventListener('click', () => {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('notebook.html')
+      });
+      window.close();
     });
-  });
+  }
 
   function updateSwitchUI(isEnabled) {
     powerToggle.checked = isEnabled;
