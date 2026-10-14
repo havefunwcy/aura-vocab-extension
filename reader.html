@@ -30,7 +30,7 @@
           <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
         </button>
 
-        <div class="page-meter" title="当前滚动所在页 / 总页数">
+        <div class="page-meter" id="page-meter" title="点击跳转指定页码">
           <span class="page-current" id="page-num">1</span>
           <span class="page-sep">/</span>
           <span class="page-total" id="page-count">1</span>
@@ -45,7 +45,7 @@
         <button class="tactile-circle-btn" id="btn-zoom-out" title="缩小 (-)">
           <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
         </button>
-        <span class="zoom-text" id="zoom-text">100%</span>
+        <span class="zoom-text" id="zoom-text">130%</span>
         <button class="tactile-circle-btn" id="btn-zoom-in" title="放大 (+)">
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         </button>
@@ -60,14 +60,14 @@
       </button>
 
       <!-- 顶栏折叠按钮 -->
-      <button class="tactile-circle-btn" id="btn-collapse-header" title="折叠顶栏 (专注纯净阅读)">
+      <button class="tactile-circle-btn" id="btn-collapse-header" title="折叠顶栏 (快捷键 H，专注沉浸阅读)">
         <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
       </button>
     </div>
   </header>
 
   <!-- 顶栏折叠后的微型展开胶囊按键 -->
-  <button class="expand-header-pill" id="btn-expand-header" title="展开控制台" style="display: none;">
+  <button class="expand-header-pill" id="btn-expand-header" title="展开控制台 (快捷键 H)" style="display: none;">
     <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
     <span>展开控制栏</span>
   </button>
@@ -75,8 +75,8 @@
   <!-- 沉浸式阅读进度记忆浮动提示 -->
   <div class="reader-toast" id="reader-toast"></div>
 
-  <!-- PDF 舞台展示区：支持鼠标滚轮连续向下平滑滚动 -->
-  <main class="reader-stage" id="reader-stage">
+  <!-- Mozilla 官方标准 PDFViewer 容器 (严丝合缝像素级对齐架构) -->
+  <div id="viewerContainer" class="pdf-viewer-container" tabindex="0">
     <!-- 拖拽上传空状态 -->
     <div class="drop-zone-overlay" id="drop-zone">
       <div class="drop-groove">
@@ -85,17 +85,16 @@
         </svg>
       </div>
       <div class="drop-title">拖拽本地 PDF 文件至此，或点击顶栏「打开 PDF」</div>
-      <div class="drop-sub">支持鼠标滚轮垂直连贯阅读整书 • 自由划词感知释义 • 自动记录所在页码</div>
+      <div class="drop-sub">Mozilla PDF.js 官方标准渲染引擎 • 连续流式垂直滚动 • 像素级零错位划词 • 自动恢复上次阅读进度</div>
     </div>
 
-    <!-- 垂直连续页面流容器 -->
-    <div class="pdf-pages-stream" id="pdf-pages-stream" style="display: none;">
-      <!-- 动态插入每页卡片 -->
-    </div>
-  </main>
+    <!-- 官方标准 PDFViewer 挂载点 -->
+    <div id="viewer" class="pdfViewer"></div>
+  </div>
 
-  <!-- 离线依赖官方 PDF.js -->
+  <!-- 离线依赖官方 PDF.js 与 PDFViewer 标准组件 -->
   <script src="libs/pdf.min.js"></script>
+  <script src="libs/pdf_viewer.min.js"></script>
   <script src="reader.js"></script>
 </body>
 </html>

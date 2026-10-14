@@ -1,6 +1,6 @@
 /**
  * Aura Dict - Standalone Continuous Scroll PDF Reader
- * 连续垂直流式滚轮排版、顶栏平滑折叠、按需懒加载与智能页码划词归档
+ * Mozilla 官方标准 PDFViewer 架构：零错位严丝合缝划词、连续滚轮排版、顶栏平滑折叠与历史页码记忆
  */
 
 if (window.pdfjsLib) {
@@ -13,9 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnExpandHeader = document.getElementById('btn-expand-header');
   const fileInput = document.getElementById('pdf-file-input');
   const dropZone = document.getElementById('drop-zone');
-  const stage = document.getElementById('reader-stage');
-  const pagesStream = document.getElementById('pdf-pages-stream');
+  const viewerContainer = document.getElementById('viewerContainer');
+  const viewerEl = document.getElementById('viewer');
   const docTitlePill = document.getElementById('doc-title-pill');
+  const pageMeter = document.getElementById('page-meter');
   const pageNumEl = document.getElementById('page-num');
   const pageCountEl = document.getElementById('page-count');
   const zoomTextEl = document.getElementById('zoom-text');
@@ -27,42 +28,158 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let pdfDoc = null;
   let currentPage = 1;
-  let scale = 1.3;
+  let targetSavedPage = 1;
   let currentFileName = '本地 PDF 文档';
   let currentFileSize = 0;
   let currentFileKey = null;
   let saveTimer = null;
-  let pageViewports = {}; // 缓存各页标准比例
-  let renderedPages = new Set(); // 记录已渲染的页码
-  let pageObserver = null;
-  let scrollTicking = false;
 
-  // 1. 顶栏折叠与展开功能
-  btnCollapseHeader.addEventListener('click', () => {
-    header.classList.add('collapsed');
-    btnExpandHeader.style.display = 'flex';
+  // 1. 初始化 Mozilla PDF.js 官方标准 PDFViewer 架构
+  const eventBus = new pdfjsViewer.EventBus();
+  const linkService = new pdfjsViewer.PDFLinkService({
+    eventBus: eventBus,
   });
 
-  btnExpandHeader.addEventListener('click', () => {
-    header.classList.remove('collapsed');
-    btnExpandHeader.style.display = 'none';
+  const pdfViewer = new pdfjsViewer.PDFViewer({
+    container: viewerContainer,
+    viewer: viewerEl,
+    eventBus: eventBus,
+    linkService: linkService,
+    l10n: pdfjsViewer.NullL10n,
+    removePageBorders: true,
   });
+  linkService.setViewer(pdfViewer);
 
-  // 快捷键 H 键切换顶栏折叠
-  document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    if (e.key === 'h' || e.key === 'H') {
-      if (header.classList.contains('collapsed')) {
-        header.classList.remove('collapsed');
-        btnExpandHeader.style.display = 'none';
-      } else {
-        header.classList.add('collapsed');
-        btnExpandHeader.style.display = 'flex';
-      }
+  // 2. 监听官方 EventBus 事件流
+  eventBus.on('pagesinit', () => {
+    // 设置舒适阅读默认缩放比例 (130%)
+    pdfViewer.currentScale = 1.3;
+    updateZoomDisplay(pdfViewer.currentScale);
+
+    // 智能恢复上次阅读位置
+    if (targetSavedPage > 1 && targetSavedPage <= pdfDoc.numPages) {
+      pdfViewer.currentPageNumber = targetSavedPage;
+      currentPage = targetSavedPage;
+      pageNumEl.textContent = currentPage;
+      showToast(`已自动跳转至上次阅读位置：第 ${targetSavedPage} / ${pdfDoc.numPages} 页`);
+    } else {
+      currentPage = 1;
+      pageNumEl.textContent = 1;
     }
   });
 
-  // 2. 文件加载与拖拽事件
+  eventBus.on('pagechanging', (evt) => {
+    const pageNum = evt.pageNumber;
+    if (pageNum && pageNum !== currentPage) {
+      currentPage = pageNum;
+      pageNumEl.textContent = currentPage;
+      saveProgressDebounced(currentPage);
+    }
+  });
+
+  eventBus.on('scalechanging', (evt) => {
+    if (evt && typeof evt.scale === 'number') {
+      updateZoomDisplay(evt.scale);
+    }
+  });
+
+  // 文本层渲染完成后做连字/字距微碎片合并（双重保险，防止极端特殊字体碎片断开）
+  eventBus.on('textlayerrendered', (evt) => {
+    try {
+      if (evt.source && evt.source.div) {
+        unifyFragmentedSpans(evt.source.div);
+      }
+    } catch (e) {
+      console.warn('unifyFragmentedSpans error:', e);
+    }
+  });
+
+  // 3. 顶栏折叠与展开功能 (支持 H 快捷键)
+  function setHeaderCollapsed(collapsed) {
+    if (collapsed) {
+      header.classList.add('collapsed');
+      viewerContainer.classList.add('header-collapsed');
+      btnExpandHeader.style.display = 'flex';
+    } else {
+      header.classList.remove('collapsed');
+      viewerContainer.classList.remove('header-collapsed');
+      btnExpandHeader.style.display = 'none';
+    }
+  }
+
+  btnCollapseHeader.addEventListener('click', () => setHeaderCollapsed(true));
+  btnExpandHeader.addEventListener('click', () => setHeaderCollapsed(false));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'h' || e.key === 'H') {
+      setHeaderCollapsed(!header.classList.contains('collapsed'));
+    }
+  });
+
+  // 4. 翻页与缩放控制
+  function updateZoomDisplay(val) {
+    zoomTextEl.textContent = `${Math.round(val * 100)}%`;
+  }
+
+  btnZoomIn.addEventListener('click', () => {
+    if (!pdfDoc) return;
+    const current = pdfViewer.currentScale || 1.3;
+    const next = Math.min(3.0, current + 0.15);
+    pdfViewer.currentScale = Math.round(next * 100) / 100;
+  });
+
+  btnZoomOut.addEventListener('click', () => {
+    if (!pdfDoc) return;
+    const current = pdfViewer.currentScale || 1.3;
+    const next = Math.max(0.5, current - 0.15);
+    pdfViewer.currentScale = Math.round(next * 100) / 100;
+  });
+
+  btnPrev.addEventListener('click', () => {
+    if (!pdfDoc || pdfViewer.currentPageNumber <= 1) return;
+    pdfViewer.previousPage();
+  });
+
+  btnNext.addEventListener('click', () => {
+    if (!pdfDoc || pdfViewer.currentPageNumber >= pdfDoc.numPages) return;
+    pdfViewer.nextPage();
+  });
+
+  // 页码点击快速跳转
+  if (pageMeter) {
+    pageMeter.addEventListener('click', () => {
+      if (!pdfDoc) return;
+      const input = prompt(`请输入要跳转的页码 (1 - ${pdfDoc.numPages}):`, pdfViewer.currentPageNumber);
+      if (input !== null) {
+        const p = parseInt(input.trim(), 10);
+        if (!isNaN(p) && p >= 1 && p <= pdfDoc.numPages) {
+          pdfViewer.currentPageNumber = p;
+          saveProgressImmediate(p);
+        }
+      }
+    });
+  }
+
+  // 快捷键支持
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (!pdfDoc) return;
+
+    if (e.key === 'PageUp' || e.key === 'ArrowLeft') {
+      if (pdfViewer.currentPageNumber > 1) pdfViewer.previousPage();
+    } else if (e.key === 'PageDown' || e.key === 'ArrowRight') {
+      if (pdfViewer.currentPageNumber < pdfDoc.numPages) pdfViewer.nextPage();
+    } else if (e.key === '+' || e.key === '=') {
+      const next = Math.min(3.0, (pdfViewer.currentScale || 1.3) + 0.15);
+      pdfViewer.currentScale = Math.round(next * 100) / 100;
+    } else if (e.key === '-') {
+      const next = Math.max(0.5, (pdfViewer.currentScale || 1.3) - 0.15);
+      pdfViewer.currentScale = Math.round(next * 100) / 100;
+    }
+  });
+
+  // 5. 文件加载与拖拽事件
   fileInput.addEventListener('click', () => {
     fileInput.value = '';
   });
@@ -72,12 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (file) loadPdfFile(file);
   });
 
-  stage.addEventListener('dragover', (e) => {
+  viewerContainer.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.stopPropagation();
   });
 
-  stage.addEventListener('drop', (e) => {
+  viewerContainer.addEventListener('drop', (e) => {
     e.preventDefault();
     e.stopPropagation();
     const files = e.dataTransfer.files;
@@ -94,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.tabs.create({ url: chrome.runtime.getURL('notebook.html') });
   });
 
-  // 3. 解析与构建连续垂直页面流（包含页码历史恢复）
   function loadPdfFile(file) {
     currentFileName = file.name;
     currentFileSize = file.size;
@@ -108,25 +224,26 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.onload = async function () {
       const typedarray = new Uint8Array(this.result);
       try {
-        pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
+        const loadingTask = pdfjsLib.getDocument({ data: typedarray });
+        pdfDoc = await loadingTask.promise;
         pageCountEl.textContent = pdfDoc.numPages;
 
-        // 查询该 PDF 历史阅读记录
-        let targetPage = 1;
+        targetSavedPage = 1;
         try {
           const { pdfHistory = {} } = await chrome.storage.local.get('pdfHistory');
           const record = pdfHistory[currentFileKey];
           if (record && record.page && record.page >= 1 && record.page <= pdfDoc.numPages) {
-            targetPage = record.page;
+            targetSavedPage = record.page;
           }
         } catch (e) {
           console.warn('获取阅读历史失败:', e);
         }
 
-        currentPage = targetPage;
         dropZone.style.display = 'none';
-        pagesStream.style.display = 'flex';
-        await initContinuousStream(targetPage);
+        viewerEl.style.display = 'block';
+
+        pdfViewer.setDocument(pdfDoc);
+        linkService.setDocument(pdfDoc, null);
       } catch (err) {
         alert('解析 PDF 失败: ' + err.message);
       }
@@ -134,259 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsArrayBuffer(file);
   }
 
-  // 初始化连续垂直流式卡片容器（自动跳转至上次记忆页码）
-  async function initContinuousStream(targetPage = 1) {
-    pagesStream.innerHTML = '';
-    renderedPages.clear();
-
-    if (pageObserver) pageObserver.disconnect();
-
-    // 先预取基准页的视口比例作为默认占位
-    const samplePageNum = Math.min(Math.max(1, targetPage), pdfDoc.numPages);
-    const samplePage = await pdfDoc.getPage(samplePageNum);
-    const baseViewport = samplePage.getViewport({ scale });
-    const defaultW = baseViewport.width;
-    const defaultH = baseViewport.height;
-
-    // 为全书每一页创建轻量占位卡片（立即确定完整滚条长度，支持鼠标滚轮自由滚动）
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const card = document.createElement('div');
-      card.className = 'pdf-page-card';
-      card.id = `page-card-${i}`;
-      card.dataset.pageNum = i;
-      card.style.width = `${defaultW}px`;
-      card.style.height = `${defaultH}px`;
-
-      card.innerHTML = `
-        <canvas class="pdf-canvas"></canvas>
-        <div class="textLayer"></div>
-      `;
-
-      pagesStream.appendChild(card);
-    }
-
-    // 设置视口观察器：进入视口时动态按需渲染（高性能懒加载）
-    pageObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const num = parseInt(entry.target.dataset.pageNum, 10);
-          if (!renderedPages.has(num)) {
-            renderSinglePage(num);
-          }
-        }
-      });
-    }, {
-      root: stage,
-      rootMargin: '500px 0px' // 上下 500px 预加载缓冲区
-    });
-
-    document.querySelectorAll('.pdf-page-card').forEach((el) => {
-      pageObserver.observe(el);
-    });
-
-    // 智能恢复上次阅读位置并优先渲染目标页
-    if (targetPage > 1 && targetPage <= pdfDoc.numPages) {
-      await renderSinglePage(targetPage);
-      if (targetPage > 1) renderSinglePage(targetPage - 1);
-      if (targetPage < pdfDoc.numPages) renderSinglePage(targetPage + 1);
-
-      requestAnimationFrame(() => {
-        const targetCard = document.getElementById(`page-card-${targetPage}`);
-        if (targetCard) {
-          stage.style.scrollBehavior = 'auto';
-          const targetOffset = targetCard.getBoundingClientRect().top - stage.getBoundingClientRect().top + stage.scrollTop;
-          stage.scrollTop = Math.max(0, targetOffset - 12);
-          stage.style.scrollBehavior = '';
-          currentPage = targetPage;
-          pageNumEl.textContent = currentPage;
-          showToast(`已自动跳转至上次阅读位置：第 ${targetPage} / ${pdfDoc.numPages} 页`);
-        }
-      });
-    } else {
-      await renderSinglePage(1);
-      if (pdfDoc.numPages > 1) renderSinglePage(2);
-      currentPage = 1;
-      pageNumEl.textContent = 1;
-    }
-  }
-
-  // 单页渲染方法
-  async function renderSinglePage(num) {
-    if (!pdfDoc || renderedPages.has(num)) return;
-    renderedPages.add(num);
-
-    const card = document.getElementById(`page-card-${num}`);
-    if (!card) return;
-
-    try {
-      const page = await pdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale });
-      pageViewports[num] = viewport;
-
-      const dpr = window.devicePixelRatio || 1;
-      const cssWidth = Math.floor(viewport.width);
-      const cssHeight = Math.floor(viewport.height);
-
-      card.style.width = `${cssWidth}px`;
-      card.style.height = `${cssHeight}px`;
-
-      const canvas = card.querySelector('.pdf-canvas');
-      const textLayerEl = card.querySelector('.textLayer');
-
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-
-      const ctx = canvas.getContext('2d');
-      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
-
-      await page.render({
-        canvasContext: ctx,
-        transform: transform,
-        viewport: viewport
-      }).promise;
-
-      // 确保 PDF 动态注入的嵌入字体 (@font-face) 完全就绪，防止 measureText 测量失真
-      if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready;
-      }
-
-      // 渲染标准 TextLayer 文本层
-      textLayerEl.innerHTML = '';
-      textLayerEl.style.setProperty('--scale-factor', viewport.scale);
-
-      if (pdfjsLib.setLayerDimensions) {
-        pdfjsLib.setLayerDimensions(textLayerEl, viewport);
-      } else {
-        textLayerEl.style.width = `${cssWidth}px`;
-        textLayerEl.style.height = `${cssHeight}px`;
-      }
-
-      const textContent = await page.getTextContent();
-      await pdfjsLib.renderTextLayer({
-        textContentSource: textContent,
-        container: textLayerEl,
-        viewport: viewport
-      }).promise;
-
-      // 消除字体排版碎片，合并连字/字距切断的同一个单词 (如 st + uff 或 c + oncern)
-      unifyFragmentedSpans(textLayerEl);
-    } catch (err) {
-      console.warn(`渲染第 ${num} 页失败:`, err);
-    }
-  }
-
-  // 4. 监听鼠标滚轮滚动，动态计算当前所在页码并联动顶栏
-  stage.addEventListener('scroll', () => {
-    if (!scrollTicking) {
-      window.requestAnimationFrame(() => {
-        updateCurrentPageOnScroll();
-        scrollTicking = false;
-      });
-      scrollTicking = true;
-    }
-  });
-
-  function updateCurrentPageOnScroll() {
-    if (!pdfDoc) return;
-    const stageRect = stage.getBoundingClientRect();
-    const stageMidY = stageRect.top + stageRect.height / 3; // 视口上三分之一为当前读点
-
-    const cards = document.querySelectorAll('.pdf-page-card');
-    for (let i = 0; i < cards.length; i++) {
-      const rect = cards[i].getBoundingClientRect();
-      if (rect.top <= stageMidY && rect.bottom >= stageMidY) {
-        const num = parseInt(cards[i].dataset.pageNum, 10);
-        if (num !== currentPage) {
-          currentPage = num;
-          pageNumEl.textContent = currentPage;
-          saveProgressDebounced(currentPage);
-        }
-        break;
-      }
-    }
-  }
-
-  // 5. 翻页按钮：平滑滚动到指定卡片
-  btnPrev.addEventListener('click', () => {
-    if (currentPage > 1) {
-      scrollToPage(currentPage - 1);
-    }
-  });
-
-  btnNext.addEventListener('click', () => {
-    if (pdfDoc && currentPage < pdfDoc.numPages) {
-      scrollToPage(currentPage + 1);
-    }
-  });
-
-  function scrollToPage(num) {
-    const target = document.getElementById(`page-card-${num}`);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      currentPage = num;
-      pageNumEl.textContent = currentPage;
-      saveProgressDebounced(currentPage);
-    }
-  }
-
-  // 页码点击快速跳转
-  const pageMeter = document.querySelector('.page-meter');
-  if (pageMeter) {
-    pageMeter.title = '点击跳转至指定页码';
-    pageMeter.addEventListener('click', () => {
-      if (!pdfDoc) return;
-      const input = prompt(`请输入要跳转的页码 (1 - ${pdfDoc.numPages}):`, currentPage);
-      if (input !== null) {
-        const p = parseInt(input.trim(), 10);
-        if (!isNaN(p) && p >= 1 && p <= pdfDoc.numPages) {
-          scrollToPage(p);
-          saveProgressImmediate(p);
-        }
-      }
-    });
-  }
-
-  // 6. 缩放控制（重新调整所有卡片占位并重绘可见区）
-  btnZoomIn.addEventListener('click', () => {
-    if (!pdfDoc || scale >= 2.8) return;
-    scale = Math.min(2.8, scale + 0.2);
-    applyZoom();
-  });
-
-  btnZoomOut.addEventListener('click', () => {
-    if (!pdfDoc || scale <= 0.8) return;
-    scale = Math.max(0.8, scale - 0.2);
-    applyZoom();
-  });
-
-  async function applyZoom() {
-    zoomTextEl.textContent = `${Math.round(scale * 100 / 1.3)}%`;
-    renderedPages.clear();
-
-    const firstPage = await pdfDoc.getPage(1);
-    const baseViewport = firstPage.getViewport({ scale });
-
-    const w = Math.floor(baseViewport.width);
-    const h = Math.floor(baseViewport.height);
-
-    document.querySelectorAll('.pdf-page-card').forEach((card) => {
-      card.style.width = `${w}px`;
-      card.style.height = `${h}px`;
-      const canvas = card.querySelector('.pdf-canvas');
-      const textLayer = card.querySelector('.textLayer');
-      if (canvas) { canvas.width = 0; canvas.height = 0; }
-      if (textLayer) { textLayer.innerHTML = ''; }
-    });
-
-    // 重新渲染当前页及附近页
-    await renderSinglePage(currentPage);
-    if (currentPage > 1) renderSinglePage(currentPage - 1);
-    if (currentPage < pdfDoc.numPages) renderSinglePage(currentPage + 1);
-  }
-
-  // 7. 新拟态实体浮窗：划词查词与智能页码收录
+  // 6. 新拟态实体浮窗：严丝合缝划词查词与智能页码归档
   let popupBox = null;
   let currentWordData = null;
   let currentSelectionContext = '';
@@ -418,8 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (popupBox) popupBox.style.display = 'none';
   }
 
-  // 监听全页流的划词事件
-  pagesStream.addEventListener('mouseup', (e) => {
+  // 监听全文阅读区的划词事件
+  viewerContainer.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
 
@@ -432,10 +297,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const cleanText = rawText.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
     if (!cleanText || cleanText.length > 80) return;
 
-    // 自动判断选区所在的是哪一页
+    // 自动感知选区所在的是哪一页
     const anchor = selection.anchorNode;
-    const cardEl = anchor ? (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement).closest('.pdf-page-card') : null;
-    activePageNum = cardEl ? parseInt(cardEl.dataset.pageNum, 10) : currentPage;
+    const pageEl = anchor ? (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement).closest('.page') : null;
+    activePageNum = pageEl ? parseInt(pageEl.getAttribute('data-page-number'), 10) : pdfViewer.currentPageNumber;
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
@@ -477,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
           curr.textContent = currText + nextText;
           next.remove();
           spans.splice(i + 1, 1);
-          i--; // 重新检查当前 span 与新的下一个 span
+          i--;
         }
       }
     }
@@ -506,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
           range.setStart(startNode, startOffset - match[0].length);
         } catch (e) {}
       } else if (startOffset === 0) {
-        // 如果当前节点开头无字符，向前检查紧邻的同级 Span（兜底 PDF 跨 span 碎片）
+        // 向前检查紧邻的同级 Span
         let currentSpan = startNode.parentElement;
         if (currentSpan && currentSpan.tagName === 'SPAN') {
           let prevSpan = currentSpan.previousElementSibling;
@@ -543,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
           range.setEnd(endNode, endOffset + match[0].length);
         } catch (e) {}
       } else if (endOffset >= endNode.textContent.length) {
-        // 如果在当前节点末尾，向后检查紧邻的同级 Span
+        // 向后检查紧邻的同级 Span
         let currentSpan = endNode.parentElement;
         if (currentSpan && currentSpan.tagName === 'SPAN') {
           let nextSpan = currentSpan.nextElementSibling;
@@ -692,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // 8. 阅读进度持久化存储与通知系统
+  // 7. 阅读进度持久化存储与通知系统
   function saveProgressDebounced(page) {
     if (!currentFileKey || !pdfDoc || !page) return;
     clearTimeout(saveTimer);
