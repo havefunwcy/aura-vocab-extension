@@ -247,6 +247,8 @@ body.reader-app {
   outline: none;
   background-color: var(--bg-stage);
   transition: top 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 #viewerContainer.header-collapsed {
@@ -315,6 +317,8 @@ body.reader-app {
 /* 3. 官方 PDF.js 标准页面流定制 (融入触感新拟态阴影与纸质质感) */
 .pdfViewer {
   padding: 24px 0 80px 0;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .pdfViewer .page {
@@ -324,22 +328,52 @@ body.reader-app {
   border-radius: 2px !important;
   background-color: #ffffff !important;
   box-sizing: content-box;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
-/* 4. PDF.js 官方标准文本层定制 (像素级精准对齐与高亮) */
+/* 4. PDF.js 官方标准文本层定制 (确保支持鼠标划选、高亮及零事件遮挡) */
 .textLayer {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 10 !important;
   opacity: 1 !important;
+  line-height: 1;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+  pointer-events: auto !important;
 }
 
-/* 划词高亮色 (柔和琥珀光) */
+.textLayer :is(span, br) {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  color: transparent !important;
+  position: absolute;
+  white-space: pre;
+  cursor: text !important;
+  transform-origin: 0 0;
+  pointer-events: auto !important;
+}
+
+/* 划词高亮色 (柔和触感琥珀光) */
 .textLayer ::selection {
-  background: rgba(217, 119, 54, 0.32) !important;
+  background: rgba(217, 119, 54, 0.35) !important;
 }
 .textLayer ::-moz-selection {
-  background: rgba(217, 119, 54, 0.32) !important;
+  background: rgba(217, 119, 54, 0.35) !important;
 }
 .textLayer br::selection {
   background: transparent !important;
+}
+
+/* 避免其它辅助图层遮挡文字划选事件 */
+.annotationEditorLayer,
+.annotationLayer {
+  pointer-events: none !important;
+}
+.annotationLayer a {
+  pointer-events: auto !important;
 }
 
 /* 5. 沉浸式阅读进度记忆浮动提示 (Toast) */

@@ -47,6 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
     linkService: linkService,
     l10n: pdfjsViewer.NullL10n,
     removePageBorders: true,
+    textLayerMode: 1, // ENABLE
+    annotationMode: 0, // DISABLE (纯净阅读，杜绝干扰图层拦截鼠标)
+    annotationEditorMode: 0, // DISABLE
   });
   linkService.setViewer(pdfViewer);
 
@@ -80,17 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
   eventBus.on('scalechanging', (evt) => {
     if (evt && typeof evt.scale === 'number') {
       updateZoomDisplay(evt.scale);
-    }
-  });
-
-  // 文本层渲染完成后做连字/字距微碎片合并（双重保险，防止极端特殊字体碎片断开）
-  eventBus.on('textlayerrendered', (evt) => {
-    try {
-      if (evt.source && evt.source.div) {
-        unifyFragmentedSpans(evt.source.div);
-      }
-    } catch (e) {
-      console.warn('unifyFragmentedSpans error:', e);
     }
   });
 
@@ -283,169 +275,150 @@ document.addEventListener('DOMContentLoaded', () => {
     if (popupBox) popupBox.style.display = 'none';
   }
 
-  // 监听全文阅读区的划词事件
-  viewerContainer.addEventListener('mouseup', (e) => {
+  // 监听划词事件（在 document 上全局监听，确保任何边界释放均可稳定捕获）
+  document.addEventListener('mouseup', (e) => {
+    // 若点击发生在浮窗内部（如点击发音或星标），不处理关闭或重新查词
+    if (popupBox && popupBox.contains(e.target)) return;
+
+    // 延迟 10ms 确保浏览器完成当前选区确定
+    setTimeout(() => {
+      handleTextSelection(e);
+    }, 10);
+  });
+
+  function handleTextSelection(e) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
-
-    // 智能整词补全与边缘吸附（消除首尾残缺错位，如 uff -> stuff、oncer -> concern）
-    expandSelectionToFullWord(selection);
 
     const rawText = selection.toString().trim();
     if (!rawText) return;
 
-    const cleanText = rawText.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
-    if (!cleanText || cleanText.length > 80) return;
-
-    // 自动感知选区所在的是哪一页
-    const anchor = selection.anchorNode;
-    const pageEl = anchor ? (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement).closest('.page') : null;
-    activePageNum = pageEl ? parseInt(pageEl.getAttribute('data-page-number'), 10) : pdfViewer.currentPageNumber;
+    // 智能提取完整单词（解决双击截断或特殊排版分段问题，不破坏原生选区）
+    const targetWord = resolveFullWord(selection, rawText);
+    if (!targetWord || targetWord.length > 80) return;
 
     const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    let rect = range.getBoundingClientRect();
+
+    // 坐标兜底：若 getBoundingClientRect 获取异常则从 ClientRects 或鼠标坐标提取
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      const clientRects = range.getClientRects();
+      if (clientRects && clientRects.length > 0) {
+        rect = clientRects[0];
+      } else {
+        rect = {
+          left: e.clientX,
+          right: e.clientX,
+          top: e.clientY,
+          bottom: e.clientY,
+          width: 1,
+          height: 1
+        };
+      }
+    }
+
+    // 感知选区所在的是哪一页
+    let pageNum = pdfViewer.currentPageNumber || 1;
+    try {
+      const anchor = selection.anchorNode;
+      const el = anchor ? (anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement) : null;
+      const pageEl = el ? el.closest('.page') : null;
+      if (pageEl && pageEl.getAttribute('data-page-number')) {
+        pageNum = parseInt(pageEl.getAttribute('data-page-number'), 10);
+      }
+    } catch (err) {}
 
     currentSelectionContext = extractContext(selection);
-    showLookup(cleanText, rect, activePageNum);
-  });
+    showLookup(targetWord, rect, pageNum);
+  }
 
+  // 点击外部空白区域关闭浮窗
   document.addEventListener('mousedown', (e) => {
     if (popupBox && !popupBox.contains(e.target)) {
       hidePopup();
     }
   });
 
-  // 合并 PDF.js 文本层因字距/连字被切割的断词碎片 (如 st + uff 或 c + oncern)
-  function unifyFragmentedSpans(textLayerEl) {
-    if (!textLayerEl) return;
-    const spans = Array.from(textLayerEl.querySelectorAll('span'));
-    if (spans.length <= 1) return;
+  // 智能词界探测：解析完整目标词汇，避免双击误伤或边缘碎片，完全不污染原生 Range 与选区
+  function resolveFullWord(selection, rawText) {
+    let clean = rawText.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
+    if (!clean) return '';
 
-    for (let i = 0; i < spans.length - 1; i++) {
-      const curr = spans[i];
-      const next = spans[i + 1];
-      if (!curr || !next || !curr.parentNode || !next.parentNode) continue;
+    // 若选中的是长句（超过 6 个单词），按句子处理不自动扩词
+    if (clean.split(/\s+/).length > 6) return clean;
 
-      const currText = curr.textContent;
-      const nextText = next.textContent;
-      if (!currText || !nextText) continue;
+    try {
+      const range = selection.getRangeAt(0);
+      const startNode = range.startContainer;
+      if (startNode && startNode.nodeType === Node.TEXT_NODE) {
+        const fullContent = startNode.textContent;
+        const startOffset = range.startOffset;
+        const endOffset = range.endOffset;
 
-      // 如果当前 span 以字母/数字结尾，下一个 span 以字母/数字开头（非空格隔开）
-      if (/[\p{L}\p{N}]$/u.test(currText) && /^[\p{L}\p{N}]/u.test(nextText)) {
-        const currRect = curr.getBoundingClientRect();
-        const nextRect = next.getBoundingClientRect();
-        const isSameLine = Math.abs(currRect.top - nextRect.top) < 6;
-        const gap = nextRect.left - currRect.right;
-
-        // 在同一行且水平间距极小 (属于同一个单词的排版碎片，通常 gap < 8px)
-        if (isSameLine && gap > -10 && gap < 8) {
-          curr.textContent = currText + nextText;
-          next.remove();
-          spans.splice(i + 1, 1);
-          i--;
+        // 向前探测同一文本节点内的单词起点
+        let wordStart = startOffset;
+        while (wordStart > 0 && /[\p{L}\p{N}]/u.test(fullContent[wordStart - 1])) {
+          wordStart--;
         }
-      }
-    }
-  }
 
-  // 智能整词吸附与补全：如果用户双击或划词时裁切在单词中段，自动补全首尾残缺部分并修正可视选区
-  function expandSelectionToFullWord(selection) {
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
-    const range = selection.getRangeAt(0);
+        // 向后探测同一文本节点内的单词终点
+        let wordEnd = range.endContainer === startNode ? endOffset : fullContent.length;
+        while (wordEnd < fullContent.length && /[\p{L}\p{N}]/u.test(fullContent[wordEnd])) {
+          wordEnd++;
+        }
 
-    const raw = selection.toString();
-    if (!raw.trim()) return null;
+        const expanded = fullContent.slice(wordStart, wordEnd).trim();
+        if (expanded && expanded.length > clean.length) {
+          clean = expanded;
+        }
 
-    // 如果选中的是长篇句子（超过 6 个单词），尊重用户意图不自动补词
-    if (raw.trim().split(/\s+/).length > 6) return range;
-
-    let startNode = range.startContainer;
-    let startOffset = range.startOffset;
-
-    // 1. 向前探索单词前缀 (Prefix)
-    if (startNode.nodeType === Node.TEXT_NODE) {
-      const textBefore = startNode.textContent.slice(0, startOffset);
-      const match = textBefore.match(/[\p{L}\p{N}]+$/u);
-      if (match) {
-        try {
-          range.setStart(startNode, startOffset - match[0].length);
-        } catch (e) {}
-      } else if (startOffset === 0) {
-        // 向前检查紧邻的同级 Span
-        let currentSpan = startNode.parentElement;
-        if (currentSpan && currentSpan.tagName === 'SPAN') {
-          let prevSpan = currentSpan.previousElementSibling;
+        // 跨 Span 碎片向前探测（如相邻的前一个 span 是 st，当前是 uff）
+        if (wordStart === 0 && startNode.parentElement) {
+          const prevSpan = startNode.parentElement.previousElementSibling;
           if (prevSpan && prevSpan.tagName === 'SPAN') {
-            const currRect = currentSpan.getBoundingClientRect();
-            const prevRect = prevSpan.getBoundingClientRect();
-            const isSameLine = Math.abs(currRect.top - prevRect.top) < 6;
-            const isAdjacent = Math.abs(currRect.left - prevRect.right) < 10;
-
-            if (isSameLine && isAdjacent) {
-              const prevText = prevSpan.textContent;
-              const prevMatch = prevText.match(/[\p{L}\p{N}]+$/u);
-              if (prevMatch) {
-                try {
-                  const targetNode = prevSpan.firstChild || prevSpan;
-                  range.setStart(targetNode, prevText.length - prevMatch[0].length);
-                } catch (e) {}
+            const prevText = prevSpan.textContent || '';
+            const prevMatch = prevText.match(/[\p{L}\p{N}]+$/u);
+            if (prevMatch) {
+              const currRect = startNode.parentElement.getBoundingClientRect();
+              const prevRect = prevSpan.getBoundingClientRect();
+              if (Math.abs(currRect.top - prevRect.top) < 8 && Math.abs(currRect.left - prevRect.right) < 12) {
+                clean = prevMatch[0] + clean;
               }
             }
           }
         }
-      }
-    }
 
-    // 2. 向后探索单词后缀 (Suffix)
-    let endNode = range.endContainer;
-    let endOffset = range.endOffset;
-
-    if (endNode.nodeType === Node.TEXT_NODE) {
-      const textAfter = endNode.textContent.slice(endOffset);
-      const match = textAfter.match(/^[\p{L}\p{N}]+/u);
-      if (match) {
-        try {
-          range.setEnd(endNode, endOffset + match[0].length);
-        } catch (e) {}
-      } else if (endOffset >= endNode.textContent.length) {
-        // 向后检查紧邻的同级 Span
-        let currentSpan = endNode.parentElement;
-        if (currentSpan && currentSpan.tagName === 'SPAN') {
-          let nextSpan = currentSpan.nextElementSibling;
-          if (nextSpan && nextSpan.tagName === 'SPAN') {
-            const currRect = currentSpan.getBoundingClientRect();
-            const nextRect = nextSpan.getBoundingClientRect();
-            const isSameLine = Math.abs(currRect.top - nextRect.top) < 6;
-            const isAdjacent = Math.abs(nextRect.left - currRect.right) < 10;
-
-            if (isSameLine && isAdjacent) {
-              const nextText = nextSpan.textContent;
+        // 跨 Span 碎片向后探测
+        const endNode = range.endContainer;
+        if (endNode && endNode.nodeType === Node.TEXT_NODE && endNode.parentElement) {
+          if (range.endOffset >= endNode.textContent.length) {
+            const nextSpan = endNode.parentElement.nextElementSibling;
+            if (nextSpan && nextSpan.tagName === 'SPAN') {
+              const nextText = nextSpan.textContent || '';
               const nextMatch = nextText.match(/^[\p{L}\p{N}]+/u);
               if (nextMatch) {
-                try {
-                  const targetNode = nextSpan.firstChild || nextSpan;
-                  range.setEnd(targetNode, nextMatch[0].length);
-                } catch (e) {}
+                const currRect = endNode.parentElement.getBoundingClientRect();
+                const nextRect = nextSpan.getBoundingClientRect();
+                if (Math.abs(currRect.top - nextRect.top) < 8 && Math.abs(nextRect.left - currRect.right) < 12) {
+                  clean = clean + nextMatch[0];
+                }
               }
             }
           }
         }
       }
+    } catch (e) {
+      console.warn('resolveFullWord error:', e);
     }
 
-    // 更新视图中的文字高亮，使之完整覆盖整个单词
-    try {
-      selection.removeAllRanges();
-      selection.addRange(range);
-    } catch (e) {}
-
-    return range;
+    return clean;
   }
 
   function extractContext(selection) {
     try {
       const node = selection.anchorNode;
-      const text = node ? node.textContent : '';
+      if (!node) return '';
+      const text = node.textContent || '';
       return text.length < 220 ? text.trim() : '';
     } catch {
       return '';
@@ -462,74 +435,91 @@ document.addEventListener('DOMContentLoaded', () => {
     positionPanel(box, rect);
     box.style.display = 'block';
 
-    chrome.runtime.sendMessage({ action: 'FETCH_YOUDAO', word }, async (res) => {
-      if (!res || !res.success || !res.data) {
-        box.innerHTML = `<div style="font-size: 12px; color: #bf6060;">未收录该单词释义</div>`;
-        return;
-      }
-
-      currentWordData = res.data;
-      const isStarred = await checkStarred(currentWordData.word);
-
-      box.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <div style="font-size:11px; font-weight:700; color:#7d8b9e; letter-spacing:0.5px;">AURA • 有道词典 (第 ${pageNum} 页)</div>
-          <div style="display:flex; gap:6px;">
-            <button id="pdf-btn-audio" class="tactile-circle-btn" title="播放发音">🔊</button>
-            <button id="pdf-btn-star" class="tactile-circle-btn" style="color:${isStarred ? '#d97736' : '#7d8b9e'}" title="加入生词本">${isStarred ? '★' : '☆'}</button>
-            <button id="pdf-btn-close" class="tactile-circle-btn" title="关闭">×</button>
-          </div>
-        </div>
-
-        <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
-          <span style="font-size:16px; font-weight:700; color:#252e3b;">${escapeHtml(currentWordData.word)}</span>
-          ${currentWordData.phonetic ? `<span style="font-size:12px; color:#7d8b9e;">[${escapeHtml(currentWordData.phonetic)}]</span>` : ''}
-        </div>
-
-        <div style="background:#e9edf2; border-radius:10px; padding:8px 10px; box-shadow:inset 2px 2px 4px rgba(166,175,189,0.38), inset -2px -2px 4px rgba(255,255,255,0.9); max-height:130px; overflow-y:auto; margin-bottom:8px;">
-          <ul style="list-style:none; padding:0; margin:0; font-size:12px; color:#3b4655; line-height:1.5;">
-            ${currentWordData.explains.map((item) => `<li style="padding:2px 0;">• ${escapeHtml(item)}</li>`).join('')}
-          </ul>
-        </div>
-
-        <div style="display:flex; justify-content:space-between; font-size:10px; color:#9caab9;">
-          <span>来源: ${escapeHtml(currentFileName)} [P.${pageNum}]</span>
-          <span>${isStarred ? '● 已收录' : '○ 点击星标入库'}</span>
-        </div>
-      `;
-
-      box.querySelector('#pdf-btn-audio').onclick = () => {
-        new Audio(currentWordData.audioUrl).play();
-      };
-
-      box.querySelector('#pdf-btn-star').onclick = async () => {
-        const starBtn = box.querySelector('#pdf-btn-star');
-        const key = currentWordData.word.toLowerCase().trim();
-        const { vocabBook = {} } = await chrome.storage.local.get('vocabBook');
-
-        if (vocabBook[key]) {
-          delete vocabBook[key];
-          starBtn.textContent = '☆';
-          starBtn.style.color = '#7d8b9e';
-        } else {
-          vocabBook[key] = {
-            word: currentWordData.word,
-            phonetic: currentWordData.phonetic || '',
-            explains: currentWordData.explains || [],
-            audioUrl: currentWordData.audioUrl || '',
-            contextSentence: currentSelectionContext || '',
-            sourceUrl: `PDF: ${currentFileName} (第 ${pageNum} 页)`,
-            sourceTitle: `${currentFileName} [第 ${pageNum} 页]`,
-            addTime: Date.now()
-          };
-          starBtn.textContent = '★';
-          starBtn.style.color = '#d97736';
+    try {
+      chrome.runtime.sendMessage({ action: 'FETCH_YOUDAO', word }, async (res) => {
+        if (chrome.runtime.lastError) {
+          box.innerHTML = `<div style="font-size: 12px; color: #bf6060;">查词通信异常，请刷新页面后重试</div>`;
+          return;
         }
-        await chrome.storage.local.set({ vocabBook });
-      };
 
-      box.querySelector('#pdf-btn-close').onclick = hidePopup;
-    });
+        if (!res || !res.success || !res.data) {
+          box.innerHTML = `<div style="font-size: 12px; color: #bf6060;">未收录该单词释义</div>`;
+          return;
+        }
+
+        currentWordData = res.data;
+        const isStarred = await checkStarred(currentWordData.word);
+
+        box.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:11px; font-weight:700; color:#7d8b9e; letter-spacing:0.5px;">AURA • 有道词典 (第 ${pageNum} 页)</div>
+            <div style="display:flex; gap:6px;">
+              <button id="pdf-btn-audio" class="tactile-circle-btn" title="播放发音">🔊</button>
+              <button id="pdf-btn-star" class="tactile-circle-btn" style="color:${isStarred ? '#d97736' : '#7d8b9e'}" title="加入生词本">${isStarred ? '★' : '☆'}</button>
+              <button id="pdf-btn-close" class="tactile-circle-btn" title="关闭">×</button>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
+            <span style="font-size:16px; font-weight:700; color:#252e3b;">${escapeHtml(currentWordData.word)}</span>
+            ${currentWordData.phonetic ? `<span style="font-size:12px; color:#7d8b9e;">[${escapeHtml(currentWordData.phonetic)}]</span>` : ''}
+          </div>
+
+          <div style="background:#e9edf2; border-radius:10px; padding:8px 10px; box-shadow:inset 2px 2px 4px rgba(166,175,189,0.38), inset -2px -2px 4px rgba(255,255,255,0.9); max-height:130px; overflow-y:auto; margin-bottom:8px;">
+            <ul style="list-style:none; padding:0; margin:0; font-size:12px; color:#3b4655; line-height:1.5;">
+              ${currentWordData.explains.map((item) => `<li style="padding:2px 0;">• ${escapeHtml(item)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:#9caab9;">
+            <span>来源: ${escapeHtml(currentFileName)} [P.${pageNum}]</span>
+            <span>${isStarred ? '● 已收录' : '○ 点击星标入库'}</span>
+          </div>
+        `;
+
+        const audioBtn = box.querySelector('#pdf-btn-audio');
+        if (audioBtn) {
+          audioBtn.onclick = () => {
+            if (currentWordData.audioUrl) {
+              new Audio(currentWordData.audioUrl).play();
+            }
+          };
+        }
+
+        const starBtn = box.querySelector('#pdf-btn-star');
+        if (starBtn) {
+          starBtn.onclick = async () => {
+            const key = currentWordData.word.toLowerCase().trim();
+            const { vocabBook = {} } = await chrome.storage.local.get('vocabBook');
+
+            if (vocabBook[key]) {
+              delete vocabBook[key];
+              starBtn.textContent = '☆';
+              starBtn.style.color = '#7d8b9e';
+            } else {
+              vocabBook[key] = {
+                word: currentWordData.word,
+                phonetic: currentWordData.phonetic || '',
+                explains: currentWordData.explains || [],
+                audioUrl: currentWordData.audioUrl || '',
+                contextSentence: currentSelectionContext || '',
+                sourceUrl: `PDF: ${currentFileName} (第 ${pageNum} 页)`,
+                sourceTitle: `${currentFileName} [第 ${pageNum} 页]`,
+                addTime: Date.now()
+              };
+              starBtn.textContent = '★';
+              starBtn.style.color = '#d97736';
+            }
+            await chrome.storage.local.set({ vocabBook });
+          };
+        }
+
+        const closeBtn = box.querySelector('#pdf-btn-close');
+        if (closeBtn) closeBtn.onclick = hidePopup;
+      });
+    } catch (e) {
+      box.innerHTML = `<div style="font-size: 12px; color: #bf6060;">查询出错: ${escapeHtml(e.message)}</div>`;
+    }
   }
 
   function positionPanel(box, rect) {
@@ -548,8 +538,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function checkStarred(word) {
-    const { vocabBook = {} } = await chrome.storage.local.get('vocabBook');
-    return !!vocabBook[word.toLowerCase().trim()];
+    try {
+      const { vocabBook = {} } = await chrome.storage.local.get('vocabBook');
+      return !!vocabBook[word.toLowerCase().trim()];
+    } catch {
+      return false;
+    }
   }
 
   function escapeHtml(str) {
